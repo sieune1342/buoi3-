@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Products Dashboard - Escuelajs</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body { background: #f6f7fb; }
+    .card { border: 0; }
+
+    .toolbar {
+      position: sticky; top: 0; z-index: 10;
+      background: #f6f7fb;
+      padding: 12px 0;
+    }
+
+    .search-group { min-width: 320px; }
+    .page-size-select { width: 140px; }
+
+    .img-thumb {
+      width: 44px; height: 44px; object-fit: cover;
+      border-radius: 8px; border: 1px solid #e6e6e6;
+      background: #fff;
+    }
+
+    .row-clickable { cursor: pointer; }
+
+    .truncate-1 {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 420px;
+      display: inline-block;
+      vertical-align: bottom;
+    }
+
+    .sort-indicator { font-size: 12px; opacity: 0.75; margin-left: 6px; }
+  </style>
+</head>
+
+<body>
+  <div class="container py-4">
+
+    <div class="toolbar">
+      <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div>
+          <h3 class="mb-1">Products Dashboard</h3>
+          <div class="text-muted small">API: https://api.escuelajs.co/api/v1/products</div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <div class="input-group search-group">
+            <span class="input-group-text">Tìm</span>
+            <input id="searchInput" type="text" class="form-control" placeholder="Tìm theo title (onChanged)..." aria-label="Tìm theo title">
+          </div>
+
+          <label for="pageSizeSelect" class="visually-hidden">Số dòng mỗi trang</label>
+          <select id="pageSizeSelect"
+                  class="form-select page-size-select"
+                  aria-label="Số dòng mỗi trang"
+                  title="Số dòng mỗi trang">
+            <option value="5">5 / trang</option>
+            <option value="10" selected>10 / trang</option>
+            <option value="20">20 / trang</option>
+          </select>
+
+          <button id="btnExportCsv" class="btn btn-outline-primary" type="button">
+            Export CSV (view hiện tại)
+          </button>
+
+          <button id="btnOpenCreate" class="btn btn-primary" type="button">
+            + Tạo sản phẩm
+          </button>
+        </div>
+      </div>
+
+      <div id="alertBox" class="mt-2"></div>
+      <hr class="my-3">
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="small text-muted" id="statusText">Đang tải dữ liệu...</div>
+          <div class="small">
+            <span class="badge text-bg-secondary" id="countBadge">0</span>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width: 90px;">ID</th>
+
+                <th>
+                  Title
+                  <button id="sortTitleBtn" class="btn btn-sm btn-outline-secondary ms-2" type="button">
+                    Sắp xếp <span id="sortTitleIndicator" class="sort-indicator"></span>
+                  </button>
+                </th>
+
+                <th style="width: 160px;">
+                  Price
+                  <button id="sortPriceBtn" class="btn btn-sm btn-outline-secondary ms-2" type="button">
+                    Sắp xếp <span id="sortPriceIndicator" class="sort-indicator"></span>
+                  </button>
+                </th>
+
+                <th style="width: 180px;">Category</th>
+                <th style="width: 220px;">Images</th>
+              </tr>
+            </thead>
+
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+          <div class="small text-muted" id="pageText">Trang 1</div>
+
+          <nav aria-label="Pagination">
+            <ul class="pagination mb-0">
+              <li class="page-item">
+                <button id="btnPrev" class="page-link" type="button" aria-label="Prev page">Prev</button>
+              </li>
+              <li class="page-item">
+                <button id="btnNext" class="page-link" type="button" aria-label="Next page">Next</button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail/Edit Modal -->
+  <div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="detailTitle">Product Detail</h5>
+            <div class="small text-muted" id="detailSub"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div id="detailView">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="fw-semibold mb-1">Description</div>
+                <div id="detailDesc" class="text-muted"></div>
+              </div>
+              <div class="col-md-6">
+                <div class="fw-semibold mb-1">Images</div>
+                <div id="detailImages" class="d-flex flex-wrap gap-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="detailEdit" class="d-none">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="editTitle">Title</label>
+                <input id="editTitle" class="form-control" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="editPrice">Price</label>
+                <input id="editPrice" type="number" class="form-control" />
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="editDesc">Description</label>
+                <textarea id="editDesc" class="form-control" rows="3"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="editCategoryId">Category</label>
+                <select id="editCategoryId" class="form-select" aria-label="Category"></select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="editImages">Images (mỗi dòng 1 URL)</label>
+                <textarea id="editImages" class="form-control" rows="3" placeholder="https://..."></textarea>
+              </div>
+              <div class="col-12">
+                <div class="small text-muted">API update được một phần, nhưng ở đây gửi đủ field để dễ dùng.</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="detailLoading" class="d-none text-center py-4">
+            <div class="spinner-border" role="status" aria-label="Loading"></div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="btnToggleEdit" class="btn btn-outline-secondary" type="button">Edit</button>
+          <button id="btnSaveEdit" class="btn btn-primary d-none" type="button">Save</button>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Modal -->
+  <div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title">Tạo sản phẩm</h5>
+            <div class="small text-muted">POST /products</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="createTitle">Title *</label>
+              <input id="createTitle" class="form-control" placeholder="New Product" />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="createPrice">Price *</label>
+              <input id="createPrice" type="number" class="form-control" placeholder="10" />
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="createDesc">Description *</label>
+              <textarea id="createDesc" class="form-control" rows="3" placeholder="A description"></textarea>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="createCategoryId">Category *</label>
+              <select id="createCategoryId" class="form-select" aria-label="Category"></select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="createImages">Images * (mỗi dòng 1 URL)</label>
+              <textarea id="createImages" class="form-control" rows="3" placeholder="https://placehold.co/600x400"></textarea>
+            </div>
+
+            <div class="col-12">
+              <div class="small text-muted">
+                * Bắt buộc theo schema. Images là mảng URL hợp lệ.
+              </div>
+            </div>
+          </div>
+
+          <div id="createLoading" class="d-none text-center py-4">
+            <div class="spinner-border" role="status" aria-label="Loading"></div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button id="btnCreate" class="btn btn-primary" type="button">Create</button>
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap bundle (tooltip + modal) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
